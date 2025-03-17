@@ -10,7 +10,7 @@ const io = socketIo(server);
 
 // PostgreSQL client
 const client = new Client({
-    connectionString: 'your_neon_connection_string_here',
+    connectionString: 'postgresql://neondb_owner:npg_H1pPu8CetkVj@ep-curly-sunset-a6py4mib-pooler.us-west-2.aws.neon.tech/neondb?sslmode=require',
 });
 
 client.connect();
@@ -23,22 +23,29 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/index.html');
 });
 
-// Listen for new WebSocket connections
 io.on('connection', (socket) => {
     console.log('A user connected');
+
+    // Send all past messages when a user connects
+    client.query('SELECT * FROM messages ORDER BY timestamp DESC LIMIT 10', (err, result) => {
+        if (err) {
+            console.error(err);
+        } else {
+            result.rows.forEach((message) => {
+                socket.emit('receiveMessage', message);
+            });
+        }
+    });
 
     // Listen for 'sendMessage' event
     socket.on('sendMessage', (messageData) => {
         const { sender, content } = messageData;
-
-        // Store the message in the database
         client.query('INSERT INTO messages(sender, content) VALUES($1, $2)', [sender, content], (err, result) => {
             if (err) {
                 console.error(err);
                 socket.emit('messageStatus', { status: 'Error saving message' });
             } else {
                 console.log('Message saved');
-                // Broadcast the new message to all connected clients
                 io.emit('receiveMessage', { sender, content, timestamp: new Date().toISOString() });
             }
         });
@@ -48,6 +55,7 @@ io.on('connection', (socket) => {
         console.log('A user disconnected');
     });
 });
+
 
 // Start the server
 const port = 3000;

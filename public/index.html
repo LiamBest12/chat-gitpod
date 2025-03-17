@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Chat</title>
+    <style>
+        /* Basic styling */
+        #chatBox { border: 1px solid #ccc; height: 300px; width: 400px; overflow-y: scroll; padding: 10px; }
+        input, button { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Chat Platform</h2>
+    <div id="chatBox"></div>
+    <input type="text" id="sender" placeholder="Your name" required>
+    <textarea id="message" placeholder="Type your message..." required></textarea><br>
+    <button id="sendMessage">Send</button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const sendButton = document.getElementById('sendMessage');
+        const senderInput = document.getElementById('sender');
+        const messageInput = document.getElementById('message');
+        const chatBox = document.getElementById('chatBox');
+
+        // Listen for messages from the server
+        socket.on('receiveMessage', (message) => {
+            const messageElement = document.createElement('div');
+            messageElement.innerHTML = `<strong>${message.sender}</strong>: ${message.content} <i>(${new Date(message.timestamp).toLocaleTimeString()})</i>`;
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;  // Scroll to the bottom
+        });
+
+        // Send a new message when the button is clicked
+        sendButton.addEventListener('click', () => {
+            const sender = senderInput.value;
+            const content = messageInput.value;
+
+            if (sender && content) {
+                // Emit the 'sendMessage' event to the server
+                socket.emit('sendMessage', { sender, content });
+
+                // Clear the message input
+                messageInput.value = '';
+            } else {
+                alert('Please enter your name and message.');
+            }
+        });
+    </script>
+</body>
+</html>
