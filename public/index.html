@@ -2,52 +2,74 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Chat</title>
-    <style>
-        /* Basic styling */
-        #chatBox { border: 1px solid #ccc; height: 300px; width: 400px; overflow-y: scroll; padding: 10px; }
-        input, button { margin: 5px; }
-    </style>
+    <title>Chat App</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <nav>Hi</nav>
 </head>
 <body>
-    <h2>Chat Platform</h2>
+    <h2>Register</h2>
+    <input type="text" id="regUsername" placeholder="Username">
+    <input type="password" id="regPassword" placeholder="Password">
+    <button onclick="register()">Sign Up</button>
+
+    <h2>Login</h2>
+    <input type="text" id="loginUsername" placeholder="Username">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button onclick="login()">Login</button>
+
+    <h2>Chat</h2>
     <div id="chatBox"></div>
-    <input type="text" id="sender" placeholder="Your name" required>
-    <textarea id="message" placeholder="Type your message..." required></textarea><br>
+    <textarea id="message" placeholder="Type a message..."></textarea>
     <button id="sendMessage">Send</button>
 
-    <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let token = null;
 
-        const sendButton = document.getElementById('sendMessage');
-        const senderInput = document.getElementById('sender');
-        const messageInput = document.getElementById('message');
-        const chatBox = document.getElementById('chatBox');
+        async function register() {
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
 
-        // Listen for messages from the server
-        socket.on('receiveMessage', (message) => {
-            const messageElement = document.createElement('div');
-            messageElement.innerHTML = `<strong>${message.sender}</strong>: ${message.content} <i>(${new Date(message.timestamp).toLocaleTimeString()})</i>`;
-            chatBox.appendChild(messageElement);
-            chatBox.scrollTop = chatBox.scrollHeight;  // Scroll to the bottom
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+            alert(data.message || "Signup failed");
+        }
+
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+            if (data.token) {
+                token = data.token;
+                alert("Login successful!");
+            } else {
+                alert("Login failed!");
+            }
+        }
+
+        document.getElementById('sendMessage').addEventListener('click', () => {
+            const content = document.getElementById('message').value;
+            if (!token) return alert("Please log in first!");
+
+            socket.emit('sendMessage', { token, content });
+            document.getElementById('message').value = '';
         });
 
-        // Send a new message when the button is clicked
-        sendButton.addEventListener('click', () => {
-            const sender = senderInput.value;
-            const content = messageInput.value;
-
-            if (sender && content) {
-                // Emit the 'sendMessage' event to the server
-                socket.emit('sendMessage', { sender, content });
-
-                // Clear the message input
-                messageInput.value = '';
-            } else {
-                alert('Please enter your name and message.');
-            }
+        socket.on('receiveMessage', (message) => {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
         });
     </script>
 </body>
