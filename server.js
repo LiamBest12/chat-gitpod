@@ -37,16 +37,21 @@ client.connect();
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
-// Route to get all messages
 app.get('/messages', async (req, res) => {
+    const afterId = parseInt(req.query.afterId) || 0;
+
     try {
-        const result = await client.query('SELECT * FROM messages ORDER BY created_at ASC');
-        res.json(result.rows); // Return messages as JSON
+        const result = await client.query(
+            'SELECT * FROM messages WHERE id > $1 ORDER BY created_at ASC', [afterId]
+        );
+
+        res.json(result.rows);
     } catch (err) {
         console.error('Error fetching messages:', err);
         res.status(500).send('Internal Server Error');
     }
 });
+
 
 // Route to register user
 app.post('/register', async (req, res) => {
@@ -95,22 +100,30 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// Route to send a new message
 app.post('/sendMessage', authenticateToken, async (req, res) => {
-    const { token, content } = req.body;
+    const { content } = req.body;
+    const userId = req.user.userId;
+    const username = req.user.username; // Get username from JWT token
+
+    if (!content.trim()) {
+        return res.status(400).json({ error: "Message cannot be empty!" });
+    }
 
     try {
-        const user = jwt.verify(token, JWT_SECRET);
         await client.query(
-            'INSERT INTO messages (user_id, content) VALUES ($1, $2)',
-            [user.userId, content]
+            'INSERT INTO messages (user_id, sender, content) VALUES ($1, $2, $3)',
+            [userId, username, content]
         );
 
-        res.status(200).send('Message sent successfully');
+        io.emit('receiveMessage', { sender: username, content, timestamp: new Date().toISOString() });
+
+        res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: "Failed to send message" });
+        console.error("Error saving message:", err);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
 
 // Create HTTP server and WebSocket server
 const server = http.createServer(app);
