@@ -45,52 +45,68 @@
             window.location.href = "/login";
         }
 
-        // Fetch existing chat messages on page load
-        async function loadMessages() {
-            try {
-                const response = await fetch('/messages'); // Endpoint to fetch messages
+        let lastMessageId = 0; // Store the ID of the last message
 
-                // Check if response is okay (status 200-299)
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch messages: ${response.statusText}`);
-                }
+    // Fetch existing chat messages on page load
+    async function loadMessages() {
+        try {
+            const response = await fetch('/messages?afterId=' + lastMessageId); // Pass the last message ID as a query parameter
 
-                // Try parsing the response as JSON
-                const messages = await response.json();  // Parse response as JSON directly
-
-                const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML = ''; // Clear existing messages (if any)
-
-                messages.forEach(message => {
-                    chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
-                });
-
-                chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
-            } catch (error) {
-                console.error("Error loading messages:", error);
+            // Check if response is okay (status 200-299)
+            if (!response.ok) {
+                throw new Error(`Failed to fetch messages: ${response.statusText}`);
             }
+
+            // Parse the response as JSON
+            const messages = await response.json();
+            const chatBox = document.getElementById('chatBox');
+
+            // Add new messages to the chatBox
+            messages.forEach(message => {
+                chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
+                lastMessageId = message.id; // Update lastMessageId with the current message's ID
+            });
+
+            chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
+        } catch (error) {
+            console.error("Error loading messages:", error);
         }
+    }
+
+
         // Send a new message
         document.getElementById('sendMessage').addEventListener('click', async () => {
             const content = document.getElementById('message').value;
             if (!content.trim()) return alert("Message cannot be empty!");
 
-            // Get the token from localStorage
-            const token = localStorage.getItem("token");
+            // Prepare the message to be sent to the server
+            const messageData = {
+                token: localStorage.getItem("token"),  // Get the JWT from localStorage
+                content
+            };
 
-            // Send the new message to the server
-            await fetch('/sendMessage', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // Send the token in the Authorization header
-                },
-                body: JSON.stringify({ token, content })
-            });
+            try {
+                // Send the new message to the server
+                const response = await fetch('/sendMessage', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${messageData.token}`  // Send token in Authorization header
+                    },
+                    body: JSON.stringify({ token: messageData.token, content: messageData.content })
+                });
 
-    document.getElementById('message').value = ''; // Clear the input
-    loadMessages(); // Reload messages after sending
-});
+                if (!response.ok) {
+                    throw new Error(`Failed to send message: ${response.statusText}`);
+                }
+
+                document.getElementById('message').value = ''; // Clear the input
+                loadMessages(); // Reload messages after sending
+            } catch (error) {
+                console.error("Error sending message:", error);
+                alert("Error sending message");
+            }
+        });
 
 
         // On page load, get messages from the server

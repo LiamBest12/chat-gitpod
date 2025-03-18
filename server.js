@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const { Client } = require('pg');
-const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const http = require('http');
@@ -16,26 +15,17 @@ const port = 3000;
 app.use(express.json());
 app.use(cors());
 
-// Middleware to authenticate users based on JWT token
-function authenticateToken(req, res, next) {
-    const token = req.headers.authorization?.split(" ")[1]; // Get the token from the Authorization header
-
-    if (!token) {
-        return res.status(403).json({ error: "Access denied, token missing!" });
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ error: "Invalid token" });
-        }
-        req.user = user; // Attach user information to the request object
-        next(); // Proceed to the next middleware or route handler
-    });
-}
-
-
 // Serve static files from the "public" folder
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve login and signup pages
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/signup', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'signup.html'));
+});
 
 // PostgreSQL client setup (Neon Database)
 const client = new Client({
@@ -43,6 +33,9 @@ const client = new Client({
     ssl: { rejectUnauthorized: false }
 });
 client.connect();
+
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
 // Route to get all messages
 app.get('/messages', async (req, res) => {
@@ -55,30 +48,69 @@ app.get('/messages', async (req, res) => {
     }
 });
 
-// Route to handle sending a new message
+// Route to register user
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const result = await client.query(
+            'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username',
+            [username, hashedPassword]
+        );
+        res.json({ user: result.rows[0], message: "User registered successfully!" });
+    } catch (err) {
+        res.status(500).json({ error: "Username might already be taken" });
+    }
+});
+
+// Route to login user
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const result = await client.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (result.rows.length === 0) return res.status(401).json({ error: "Invalid credentials" });
+
+        const user = result.rows[0];
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (!passwordMatch) return res.status(401).json({ error: "Invalid credentials" });
+
+        const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    } catch (err) {
+        res.status(500).json({ error: "Login failed" });
+    }
+});
+
+// Middleware to authenticate token
+function authenticateToken(req, res, next) {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(403).json({ error: "Access denied" });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: "Invalid token" });
+        req.user = user;
+        next();
+    });
+}
+
+// Route to send a new message
 app.post('/sendMessage', authenticateToken, async (req, res) => {
     const { token, content } = req.body;
 
     try {
-        // Verify user from token
         const user = jwt.verify(token, JWT_SECRET);
-
-        // Insert the new message into the database
         await client.query(
             'INSERT INTO messages (user_id, content) VALUES ($1, $2)',
             [user.userId, content]
         );
 
-        // Emit the message to all connected users via WebSocket
-        io.emit('receiveMessage', { sender: user.username, content, timestamp: new Date().toISOString() });
-
-        res.status(200).send('Message sent successfully!');
+        res.status(200).send('Message sent successfully');
     } catch (err) {
-        console.error("Error sending message:", err);
-        res.status(500).send('Failed to send message');
+        res.status(500).json({ error: "Failed to send message" });
     }
 });
-
 
 // Create HTTP server and WebSocket server
 const server = http.createServer(app);
@@ -86,22 +118,20 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// WebSocket Chat Logic
+// WebSocket logic
 io.on('connection', (socket) => {
     console.log('A user connected');
 
-    // Handle incoming messages
     socket.on('sendMessage', async (messageData) => {
         const { token, content } = messageData;
 
         try {
-            const user = jwt.verify(token, process.env.JWT_SECRET);
+            const user = jwt.verify(token, JWT_SECRET);
             await client.query(
                 'INSERT INTO messages (user_id, content) VALUES ($1, $2)',
                 [user.userId, content]
             );
 
-            // Emit the new message to all connected clients
             io.emit('receiveMessage', { sender: user.username, content, timestamp: new Date().toISOString() });
         } catch (err) {
             console.error("Error saving message:", err);
