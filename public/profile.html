@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        async function loadProfile() {
+            let token = localStorage.getItem("token");
+            if (!token) {
+                window.location.href = "/login";
+                return;
+            }
+    
+            // Get user ID from URL, if any
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get("user");
+    
+            const response = await fetch(userId ? `/profile/${userId}` : '/profile', {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+    
+            const user = await response.json();
+    
+            if (user.error) {
+                alert(user.error);
+                return;
+            }
+    
+            document.getElementById("username").textContent = user.username;
+            document.getElementById("email").textContent = user.email;
+            document.getElementById("bio").value = user.bio;
+            if (user.profile_picture) {
+                document.getElementById("profilePic").src = user.profile_picture;
+            }
+    
+            // Hide edit fields if viewing another user's profile
+            if (userId) {
+                document.getElementById("bio").disabled = true;
+                document.getElementById("updateBtn").style.display = "none";
+            }
+        }
+    
+        window.onload = loadProfile;
+    </script>
+</head>
+<body>
+    <div id="nav-placeholder"></div>
+
+    <script>
+        fetch('/navbar.html')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('nav-placeholder').innerHTML = data;
+            })
+            .catch(error => console.error('Error loading navbar:', error));
+    </script>
+
+    <h2>User Profile</h2>
+    <img id="profilePic" src="default.png" alt="Profile Picture" width="100">
+    <p><strong>Username:</strong> <span id="username"></span></p>
+    <p><strong>Email:</strong> <span id="email"></span></p>
+    <p><strong>Bio:</strong> <textarea id="bio"></textarea></p>
+    <button onclick="updateProfile()">Update Profile</button>
+
+    <script>
+        function logout() {
+            localStorage.removeItem("token");
+            window.location.href = "/login";
+        }
+    </script>
+</body>
+</html>

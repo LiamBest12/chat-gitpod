@@ -27,6 +27,40 @@ app.get('/signup', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'signup.html'));
 });
 
+// Fetch a specific user's profile by ID
+app.get('/profile/:userId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const result = await client.query(
+            'SELECT username, email, bio, profile_picture FROM users WHERE id = $1',
+            [userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("Error fetching profile:", err);
+        res.status(500).json({ error: "Failed to load profile" });
+    }
+});
+
+
+// Update user profile
+app.put('/profile', authenticateToken, async (req, res) => {
+    try {
+        const { bio } = req.body;
+        await client.query('UPDATE users SET bio = $1 WHERE id = $2', [bio, req.user.userId]);
+        res.json({ message: "Profile updated successfully!" });
+    } catch (err) {
+        console.error("Error updating profile:", err);
+        res.status(500).json({ error: "Failed to update profile" });
+    }
+});
+
+
 // PostgreSQL client setup (Neon Database)
 const client = new Client({
     connectionString: "postgresql://neondb_owner:npg_H1pPu8CetkVj@ep-curly-sunset-a6py4mib-pooler.us-west-2.aws.neon.tech/neondb?sslmode=require",

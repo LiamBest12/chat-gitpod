@@ -55,10 +55,20 @@
             const messages = await response.json();
             const chatBox = document.getElementById('chatBox');
 
-            // Add new messages to the chatBox
-            messages.forEach(message => {
-                chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
-                lastMessageId = message.id; // Update lastMessageId with the current message's ID
+            messages.forEach(msg => {
+                let messageElement = document.createElement("div");
+                messageElement.innerHTML = `
+                    <strong><span class="username" data-userid="${msg.sender_id}">${msg.username}</span>:</strong> ${msg.message}
+                `;
+                messageBox.appendChild(messageElement);
+            });
+
+            // Attach click event to usernames
+            document.querySelectorAll(".username").forEach(user => {
+                user.addEventListener("click", function() {
+                    let userId = this.getAttribute("data-userid");
+                    window.location.href = `/profile.html?user=${userId}`;
+                });
             });
 
             chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
