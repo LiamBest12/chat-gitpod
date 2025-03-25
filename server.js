@@ -27,6 +27,27 @@ app.get('/signup', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'signup.html'));
 });
 
+// Create a new chat room
+app.post('/createRoom', authenticateToken, async (req, res) => {
+    const { name } = req.body;
+    try {
+        const result = await client.query('INSERT INTO rooms (name) VALUES ($1) RETURNING *', [name]);
+        res.json({ room: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: "Room creation failed or already exists" });
+    }
+});
+
+// Get all chat rooms
+app.get('/rooms', async (req, res) => {
+    try {
+        const result = await client.query('SELECT * FROM rooms');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to retrieve rooms" });
+    }
+});
+
 // PostgreSQL client setup (Neon Database)
 const client = new Client({
     connectionString: "postgresql://neondb_owner:npg_H1pPu8CetkVj@ep-curly-sunset-a6py4mib-pooler.us-west-2.aws.neon.tech/neondb?sslmode=require",
