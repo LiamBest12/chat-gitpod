@@ -20,79 +20,68 @@
     
     <h2>Welcome to the Chat</h2>
     <button onclick="logout()">Logout</button>
-    <div id="chatBox"></div> <!-- Chat messages container -->
+    <div id="chatBox"></div>
     <textarea id="message" placeholder="Type a message..."></textarea>
     <button id="sendMessage">Send</button>
 
     <script>
-        new Promise(promise) => {
-            //Update this every second 
-            
-        } 
+        
     </script>
 
     <script>
         const socket = io();
         let token = localStorage.getItem("token");
 
-        // If no token, redirect to login
         if (!token) {
             window.location.href = "/login";
         }
 
-        // Function to log out
         function logout() {
             localStorage.removeItem("token");
             window.location.href = "/login";
         }
 
-        let lastMessageId = 0; // Store the ID of the last message
+        let lastMessageId = 0;
 
-    // Fetch existing chat messages on page load
     async function loadMessages() {
         try {
-            const response = await fetch('/messages?afterId=' + lastMessageId); // Pass the last message ID as a query parameter
+            const response = await fetch('/messages?afterId=' + lastMessageId);
 
-            // Check if response is okay (status 200-299)
             if (!response.ok) {
                 throw new Error(`Failed to fetch messages: ${response.statusText}`);
             }
 
-            // Parse the response as JSON
             const messages = await response.json();
             const chatBox = document.getElementById('chatBox');
 
-            // Add new messages to the chatBox
             messages.forEach(message => {
                 chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
-                lastMessageId = message.id; // Update lastMessageId with the current message's ID
+                lastMessageId = message.id;
             });
 
-            chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            setTimeout(loadMessages, 1000);
         } catch (error) {
             console.error("Error loading messages:", error);
         }
     }
 
-
-        // Send a new message
         document.getElementById('sendMessage').addEventListener('click', async () => {
             const content = document.getElementById('message').value;
             if (!content.trim()) return alert("Message cannot be empty!");
 
-            // Prepare the message to be sent to the server
             const messageData = {
-                token: localStorage.getItem("token"),  // Get the JWT from localStorage
+                token: localStorage.getItem("token"),
                 content
             };
 
             try {
-                // Send the new message to the server
                 const response = await fetch('/sendMessage', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${messageData.token}`  // Send token in Authorization header
+                        'Authorization': `Bearer ${messageData.token}`
                     },
                     body: JSON.stringify({ token: messageData.token, content: messageData.content })
                 });
@@ -101,16 +90,14 @@
                     throw new Error(`Failed to send message: ${response.statusText}`);
                 }
 
-                document.getElementById('message').value = ''; // Clear the input
-                loadMessages(); // Reload messages after sending
+                document.getElementById('message').value = '';
+                loadMessages();
             } catch (error) {
                 console.error("Error sending message:", error);
                 alert("Error sending message");
             }
         });
 
-
-        // On page load, get messages from the server
         loadMessages();
     </script>
 </body>
