@@ -29,32 +29,34 @@
         </div>
     </div>
     <style>
-        body {
-            background: #f4f6fb;
-            font-family: 'Segoe UI', Arial, sans-serif;
+        html, body {
+            height: 100%;
             margin: 0;
             padding: 0;
         }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-            padding: 0 0 20px 0;
+        body {
+            background: #181c24;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            height: 100vh;
+            width: 100vw;
         }
-        .chat-header {
+        .container {
+            height: 100vh;
+            width: 100vw;
+            max-width: none;
+            margin: 0;
+            background: #23283a;
+            border-radius: 0;
+            box-shadow: none;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #4f8cff;
-            color: #fff;
-            border-radius: 12px 12px 0 0;
-            padding: 18px 24px;
+            flex-direction: column;
         }
         .logout-btn {
-            background: #fff;
-            color: #4f8cff;
+            background: #2d3347;
+            color: #fff;
             border: none;
             border-radius: 6px;
             padding: 8px 18px;
@@ -63,35 +65,42 @@
             transition: background 0.2s;
         }
         .logout-btn:hover {
-            background: #e3eaff;
+            background: #3a405a;
         }
         .chat-box {
-            min-height: 320px;
-            max-height: 400px;
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
             overflow-y: auto;
-            padding: 18px 24px;
-            background: #f9fbff;
-            border-bottom: 1px solid #e3eaff;
+            padding: 24px 32px;
+            background: #181c24;
+            border-bottom: 1px solid #2d3347;
         }
-        .chat-input {
-            width: 100%;
-            min-height: 40px;
-            max-height: 80px;
-            resize: vertical;
-            border-radius: 8px;
-            border: 1px solid #c7d7ff;
-            padding: 10px;
-            font-size: 1rem;
-            margin-right: 10px;
+            #chatBox div {
+                margin-bottom: 10px;
+                padding: 10px 16px;
+                background: #2d3347;
+                color: #fff;
+                border-radius: 8px;
+                max-width: 80%;
+                word-break: break-word;
+            }
+            #chatBox div strong {
+                color: #b0b3c2;
+            }
             box-sizing: border-box;
+        /* removed stray closing bracket */
+        .chat-input::placeholder {
+            color: #7a819a;
         }
         .input-row {
             display: flex;
             gap: 10px;
-            padding: 16px 24px 0 24px;
+            padding: 20px 32px 20px 32px;
+            background: #23283a;
         }
         .send-btn {
-            background: #4f8cff;
+            background: #444857;
             color: #fff;
             border: none;
             border-radius: 8px;
@@ -102,24 +111,9 @@
             transition: background 0.2s;
         }
         .send-btn:hover {
-            background: #2563eb;
-        }
-        #chatBox div {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            background: #e3eaff;
-            border-radius: 8px;
-            max-width: 80%;
-            word-break: break-word;
-        }
-        #chatBox div strong {
-            color: #2563eb;
+            background: #5a5e6e;
         }
     </style>
-
-    <script>
-        
-    </script>
 
     <script>
         const socket = io();
@@ -135,29 +129,29 @@
 
         let lastMessageId = 0;
 
-    async function loadMessages() {
-        try {
-            const response = await fetch('/messages?afterId=' + lastMessageId);
+        async function loadMessages() {
+            try {
+                const response = await fetch('/messages?afterId=' + lastMessageId);
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch messages: ${response.statusText}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch messages: ${response.statusText}`);
+                }
+
+                const messages = await response.json();
+                const chatBox = document.getElementById('chatBox');
+
+                messages.forEach(message => {
+                    chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
+                    lastMessageId = message.id;
+                });
+
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                setTimeout(loadMessages, 1000);
+            } catch (error) {
+                window.location.href = "/login";
             }
-
-            const messages = await response.json();
-            const chatBox = document.getElementById('chatBox');
-
-            messages.forEach(message => {
-                chatBox.innerHTML += `<div><strong>${message.sender}:</strong> ${message.content}</div>`;
-                lastMessageId = message.id;
-            });
-
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            setTimeout(loadMessages, 1000);
-        } catch (error) {
-            console.error("Error loading messages:", error);
         }
-    }
 
         document.getElementById('sendMessage').addEventListener('click', async () => {
             const content = document.getElementById('message').value;
